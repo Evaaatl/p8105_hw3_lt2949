@@ -2,7 +2,7 @@
 title: "p8105_hw3_lt2949"
 author: "Li Tian"
 date: "2023-10-10"
-output: github_document
+output: html_document
 ---
 
 
