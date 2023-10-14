@@ -11,13 +11,71 @@ library(ggplot2)
 library(readxl)
 library(tidyr)
 library(stringr)
+library(tidyverse)
+library(ggridges)
+library(patchwork)
 ```
 
 
 # Problem1
 ```{r}
 data("instacart")
+
+instacart = 
+  instacart |> 
+  as_tibble()
 ```
+
+This dataset contains `r nrow(instacart)` rows and `r ncol(instacart)` columns, with each row resprenting a single product from an instacart order. Variables include identifiers for user, order, and product; the order in which each product was added to the cart. There are several order-level variables, describing the day and time of the order, and number of days since prior order. Then there are several item-specific variables, describing the product name (e.g. Yogurt, Avocado), department (e.g. dairy and eggs, produce), and aisle (e.g. yogurt, fresh fruits), and whether the item has been ordered by this user in the past. In total, there are `r instacart |> select(product_id) |> distinct() |> count()` products found in `r instacart |> select(user_id, order_id) |> distinct() |> count()` orders from `r instacart |> select(user_id) |> distinct() |> count()` distinct users.
+
+Below is a table summarizing the number of items ordered from aisle. In total, there are 134 aisles, with fresh vegetables and fresh fruits holding the most items ordered by far.
+
+```{r}
+instacart |> 
+  count(aisle) |> 
+  arrange(desc(n))
+```
+
+Next is a plot that shows the number of items ordered in each aisle. Here, aisles are ordered by ascending number of items.
+
+```{r}
+instacart |> 
+  count(aisle) |> 
+  filter(n > 10000) |> 
+  mutate(aisle = fct_reorder(aisle, n)) |> 
+  ggplot(aes(x = aisle, y = n)) + 
+  geom_point() + 
+  labs(title = "Number of items ordered in each aisle") +
+  theme(axis.text.x = element_text(angle = 60, hjust = 1))
+
+```
+
+Our next table shows the three most popular items in aisles `baking ingredients`, `dog food care`, and `packaged vegetables fruits`, and includes the number of times each item is ordered in your table.
+
+```{r}
+instacart |> 
+  filter(aisle %in% c("baking ingredients", "dog food care", "packaged vegetables fruits")) |>
+  group_by(aisle) |> 
+  count(product_name) |> 
+  mutate(rank = min_rank(desc(n))) |> 
+  filter(rank < 4) |> 
+  arrange(desc(n)) |>
+  knitr::kable()
+```
+
+Finally is a table showing the mean hour of the day at which Pink Lady Apples and Coffee Ice Cream are ordered on each day of the week. This table has been formatted in an untidy manner for human readers. Pink Lady Apples are generally purchased slightly earlier in the day than Coffee Ice Cream, with the exception of day 5.
+
+```{r}
+instacart |>
+  filter(product_name %in% c("Pink Lady Apples", "Coffee Ice Cream")) |>
+  group_by(product_name, order_dow) |>
+  summarize(mean_hour = mean(order_hour_of_day)) |>
+  pivot_wider(
+    names_from = order_dow, 
+    values_from = mean_hour) |>
+  knitr::kable(digits = 2)
+```
+
 
 # Problem2
 ```{r}
@@ -47,6 +105,7 @@ states_2002 <-
   group_by(state_id) |>
   summarise(num_location2002 = n_distinct(county_id)) |>
   filter(num_location2002 >=7)
+knitr::kable(states_2002)
 
 states_2010 <- 
   cleaned_bs2010 |>
@@ -54,13 +113,13 @@ states_2010 <-
   group_by(state_id) |>
   summarise(num_location2010 = n_distinct(county_id)) |>
   filter(num_location2010 >= 7)
-
-print(states_2002$state_id)
-print(states_2010$state_id)
+knitr::kable(states_2010)
 
 ```
+
 In 2002, `r states_2002$state_id` those `r nrow(states_2002)` states were observed at 7 or more locations. \
 In 2010, `r states_2010$state_id` those `r nrow(states_2010)` states were observed at 7 or more locations.
+
 ```{r}
 # Spaghetti plot
 excellent_data <- 
@@ -76,7 +135,7 @@ ggplot(excellent_data, aes(x = year, y = avg_data_value, group = state_id, color
   theme_dark() 
   
 ```
-Here is the "spaghetti" plot, showing the average value of 'Excellent' response from 2002 to 2010 by the location states.
+Here is the "spaghetti" plot, showing the average value of 'Excellent' response from 2002 to 2010 by the location states. Every state is represented by a distinct line that showcases the shifts in average data values over this period. These values generally hover between 15 to 30.
 
 ```{r}
 # Two-panel plot
@@ -92,7 +151,7 @@ ggplot(ny_data, aes(x = response, y = data_value, fill = response)) +
        y = "Data Value") 
 
 ```
-This is two-panel plot, which shows the data value distribution for five response levels among locations in NY state in 2006 and 2010. Both in 2006 and 2010 plots, the "Poor" response has smallest range of data values, while "Very Good" has the widest range.
+This two-panel plot displays the data value distribution for five response levels across locations in NY state for the years 2006 and 2010. In both the 2006 and 2010 plots, the "Poor" response has the smallest range of data values, while "Very Good" exhibits the broadest range.
 
 # Problem3
 ```{r}
@@ -124,17 +183,16 @@ cleaned_data <-
            "More than high school", ordered = TRUE)
           )) 
 ```
-We import and cleaned two datasets, then merge them by "seqn" which I rename as "participants_id". 
+We import and cleaned two datasets, then merge them by "seqn" which I rename as `participant_id`. 
 
 ```{r} 
 # Produce  a reader-friendly table
 reader_table <- 
   cleaned_data |>
   group_by(sex, education) |>
-  summarise(count = n()) |>
-  pivot_wider(names_from = sex, values_from = count)
-
-print(reader_table)
+  summarise(count = n(), .groups = "drop") |>
+  pivot_wider(names_from = sex, values_from = count) |>
+  knitr::kable()
 
 # Visualization of the age distribution
 ggplot(cleaned_data, aes(x = education, y = age, fill = sex)) +
@@ -148,18 +206,23 @@ ggplot(cleaned_data, aes(x = education, y = age, fill = sex)) +
 The box plot illustrates the age distribution across three educational levels for both genders. The table indicates a higher number of females in the advanced education category, while more males possess a high school-equivalent education. 
 
 ```{r}
-avg_activity_data <- cleaned_data |>
-  group_by(education, sex) |>
-  summarise(across(starts_with("min"), mean, .names = "mean_{.col}"), .groups = "drop") |>
-  pivot_longer(cols = starts_with("mean_"), names_to = "time", values_to = "mean") |>
-  mutate(time = as.numeric(str_remove(time, "mean_min")))
          
-ggplot(avg_activity_data, aes(x = time, y = mean, color = sex)) +
-  geom_line() +
+activity_data <- cleaned_data |>
+  pivot_longer(
+    min1:min1440,
+    names_to="minute",
+    values_to="activity_level",
+    names_prefix = "min"
+  ) |>
+  mutate(minute = as.numeric(minute) / 60)
+         
+ggplot(activity_data, aes(x = minute, y = activity_level, color = sex)) +
+  geom_point() +
+  geom_smooth() +
   facet_grid(~education) +
   labs(title = "24-Hour Activity by Education and Gender", 
        x = "Time in mins",
-       y = "Mean value of activity")
+       y = "Activity level") 
 ```
-
+The visual displays activity levels (0 to 100) for three education levels over time, segmented by minutes. Males are in purple, females in yellow. Trend lines show average activity for each gender, revealing distinct patterns across education categories. A color legend clarifies gender differentiation.
 
