@@ -10,6 +10,7 @@ library(dplyr)
 library(ggplot2)
 library(readxl)
 library(tidyr)
+library(stringr)
 ```
 
 
@@ -26,6 +27,7 @@ data("brfss_smart2010")
 # Clean the data
 cleaned_bs2010 <- brfss_smart2010 |>
   janitor::clean_names() |>
+  # Rename suitable vairiable names
    rename("state_id" = "locationabbr",
           "county_id" = "locationdesc") |>
   filter(topic == "Overall Health",
@@ -58,7 +60,7 @@ print(states_2010$state_id)
 
 ```
 In 2002, `r states_2002$state_id` those `r nrow(states_2002)` states were observed at 7 or more locations. \
-In 2010, `r states_2010$state_idr` those `r nrow(states_2010)` states were observed at 7 or more locations.
+In 2010, `r states_2010$state_id` those `r nrow(states_2010)` states were observed at 7 or more locations.
 ```{r}
 # Spaghetti plot
 excellent_data <- 
@@ -73,8 +75,9 @@ ggplot(excellent_data, aes(x = year, y = avg_data_value, group = state_id, color
        y = "Average Data Value") +
   theme_dark() 
   
-
 ```
+Here is the "spaghetti" plot, showing the average value of 'Excellent' response from 2002 to 2010 by the location states.
+
 ```{r}
 # Two-panel plot
 ny_data <- 
@@ -89,6 +92,7 @@ ggplot(ny_data, aes(x = response, y = data_value, fill = response)) +
        y = "Data Value") 
 
 ```
+This is two-panel plot, which shows the data value distribution for five response levels among locations in NY state in 2006 and 2010. Both in 2006 and 2010 plots, the "Poor" response has smallest range of data values, while "Very Good" has the widest range.
 
 # Problem3
 ```{r}
@@ -120,46 +124,42 @@ cleaned_data <-
            "More than high school", ordered = TRUE)
           )) 
 ```
+We import and cleaned two datasets, then merge them by "seqn" which I rename as "participants_id". 
 
 ```{r} 
 # Produce  a reader-friendly table
 reader_table <- 
   cleaned_data |>
   group_by(sex, education) |>
-  summarise(count = n())
+  summarise(count = n()) |>
+  pivot_wider(names_from = sex, values_from = count)
+
 print(reader_table)
 
 # Visualization of the age distribution
-ggplot(cleaned_data, aes(x = age, fill = sex)) +
-  geom_histogram(alpha = 0.5, position = "identity") +
-  facet_wrap(~ education) +
-  labs(title = "Age Distribution by Sex and Education") +
+ggplot(cleaned_data, aes(x = education, y = age, fill = sex)) +
+  geom_boxplot() +
+  labs(title = "Age Distribution by Sex and Education",
+       x = "Education level",
+       y = "Age") +
   theme(legend.position = "bottom")
 
 ```
-```{r}
-# Calculate a total activity variable
-total_activity_data <- 
-  cleaned_data |>
-  rowwise() |>
-  mutate(total_activity = sum(c_across(starts_with("min"))))
-
-# Visualization the total activity
-ggplot(total_activity_data, aes(x = age, y = total_activity, color = sex)) +
-  geom_point(alpha = .7) +
-  geom_smooth() +
-  facet_wrap(~ education) +
-  labs(title = "Total Activity vs Age by Sex and Education")
-
-```
-
+The box plot illustrates the age distribution across three educational levels for both genders. The table indicates a higher number of females in the advanced education category, while more males possess a high school-equivalent education. 
 
 ```{r}
-avg_activity_data <-
-  cleaned_data |>
+avg_activity_data <- cleaned_data |>
   group_by(education, sex) |>
-  summarise(avg_activity = mean(c_across(starts_with("min")), na.rm = TRUE), .groups = "drop")
-
+  summarise(across(starts_with("min"), mean, .names = "mean_{.col}"), .groups = "drop") |>
+  pivot_longer(cols = starts_with("mean_"), names_to = "time", values_to = "mean") |>
+  mutate(time = as.numeric(str_remove(time, "mean_min")))
+         
+ggplot(avg_activity_data, aes(x = time, y = mean, color = sex)) +
+  geom_line() +
+  facet_grid(~education) +
+  labs(title = "24-Hour Activity by Education and Gender", 
+       x = "Time in mins",
+       y = "Mean value of activity")
 ```
 
 
